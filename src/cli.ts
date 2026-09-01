@@ -33,7 +33,8 @@ radar-de-vagas — coleta vagas de fontes públicas
   node src/cli.ts status
       Mostra o que há no banco e as últimas rodadas.
 
-  node src/cli.ts buscar [--termo t] [--area a] [--contrato c] [--modelo m] [--cidade c] [--dias N]
+  node src/cli.ts buscar [--termo t] [--area a] [--contrato c] [--modelo m] [--cidade c]
+                          [--senioridade s] [--salario N] [--dias N]
       Consulta o banco. Serve para conferir a coleta antes de existir site.
 `;
 
@@ -94,6 +95,8 @@ if (comando === 'coletar') {
     contrato: opcao('contrato'),
     modelo: opcao('modelo'),
     cidade: opcao('cidade'),
+    senioridade: opcao('senioridade'),
+    salarioMin: numero('salario'),
     dias: numero('dias'),
     limite: numero('limite') ?? 20,
   });

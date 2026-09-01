@@ -62,6 +62,8 @@ export interface Vaga {
   modelo: Modelo;
   contrato: Contrato;
   area: string;
+  senioridade: string | null;
+  salario: number | null;
   afirmativa: boolean;
   publicadaEm: string;
   prazoAte: string | null;

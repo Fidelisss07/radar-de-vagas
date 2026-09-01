@@ -9,6 +9,7 @@
 import { varrerFatia } from './fontes/gupy.ts';
 import { montarFatias, adivinharArea } from './dicionario.ts';
 import { abrirRodada, fecharRodada, salvarLote } from './banco/index.ts';
+import { acharSenioridade, acharSalario, ehExclusivaPcD } from './enriquecer.ts';
 import type { Contrato, Fatia, Modelo, Vaga, VagaBruta } from './tipos.ts';
 
 const CONTRATOS: Record<string, Contrato> = {
@@ -43,21 +44,25 @@ function limparTexto(bruto: string): string {
 /** Converte o que a fonte devolve no que a gente guarda. */
 export function normalizar(b: VagaBruta, fatia: Fatia): Vaga {
   const area = fatia.area !== 'geral' ? fatia.area : adivinharArea(b.name);
+  const titulo = (b.name ?? '').trim();
+  const descricao = limparTexto(b.description).slice(0, 4000);
 
   return {
     id: b.id,
     fonte: 'gupy',
-    titulo: (b.name ?? '').trim(),
+    titulo,
     empresa: (b.careerPageName ?? '').trim() || 'Confidencial',
     logo: b.careerPageLogo || null,
-    // 4000 caracteres cobrem a descrição inteira na quase totalidade dos casos
-    descricao: limparTexto(b.description).slice(0, 4000),
+    descricao,
     cidade: b.city?.trim() || null,
     estado: b.state?.trim() || null,
     modelo: MODELOS[b.workplaceType] ?? (b.isRemoteWork ? 'remoto' : 'presencial'),
     contrato: CONTRATOS[b.type] ?? 'outro',
     area,
-    afirmativa: Boolean(b.disabilities),
+    senioridade: acharSenioridade(titulo),
+    salario: acharSalario(descricao),
+    // O campo da fonte marca quase tudo: só vale como exclusiva se o texto disser
+    afirmativa: ehExclusivaPcD(titulo, descricao),
     publicadaEm: b.publishedDate,
     prazoAte: b.applicationDeadline ?? null,
     url: b.jobUrl,

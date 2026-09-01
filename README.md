@@ -26,6 +26,27 @@ node src/cli.ts buscar --modelo remoto --dias 7   # consulta
 
 Sem `--fatias`, percorre o dicionário inteiro.
 
+Filtros da busca: `--termo`, `--area`, `--contrato`, `--modelo`, `--cidade`,
+`--senioridade`, `--salario` (mínimo), `--dias` e `--limite`.
+
+## O que o coletor deduz do texto
+
+A fonte não separa senioridade nem salário — os dois ficam soltos no título e no
+meio da descrição. O coletor deduz os dois, e prefere não afirmar a afirmar
+errado: quando não dá para saber, grava `null` e a busca trata como "não filtra".
+
+| Campo | De onde sai | Cobertura medida |
+| --- | --- | --- |
+| `senioridade` | só do título — a descrição cita outras vagas do time e envenena o resultado | 65% das vagas |
+| `salario` | valor precedido de palavra de remuneração; benefício é descartado | 6% das vagas |
+| `afirmativa` | menção explícita de vaga exclusiva PcD, não o campo `disabilities` da fonte | 15% das vagas |
+
+Dois desses recortes vieram de erro medido em dado real. O campo `disabilities`
+da Gupy marcava 84% das vagas como afirmativas — ele quer dizer "aceita
+candidatura", não "vaga exclusiva". E pegar o menor `R$` da descrição anunciava
+"R$ 507" numa vaga de back-end pleno: era o vale-alimentação. Número errado é
+pior que campo vazio, porque a pessoa descarta a vaga sem abrir.
+
 ## Ligando no Supabase
 
 O SQLite serve para desenvolver. Em produção quem responde é o Supabase, porque

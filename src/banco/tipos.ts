@@ -8,6 +8,8 @@ export interface Filtros {
   contrato?: string;
   modelo?: string;
   cidade?: string;
+  senioridade?: string;
+  salarioMin?: number;
   dias?: number;
   limite?: number;
 }

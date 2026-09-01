@@ -41,6 +41,8 @@ function abrir(): DatabaseSync {
       modelo       TEXT NOT NULL,
       contrato     TEXT NOT NULL,
       area         TEXT NOT NULL,
+      senioridade  TEXT,
+      salario      REAL,
       afirmativa   INTEGER NOT NULL DEFAULT 0,
       publicadaEm  TEXT NOT NULL,
       prazoAte     TEXT,
@@ -67,6 +69,18 @@ function abrir(): DatabaseSync {
     );
   `);
 
+  // Um banco criado antes destas colunas não ganha elas pelo CREATE TABLE IF
+  // NOT EXISTS acima — ele só não faz nada quando a tabela já existe. Então
+  // conferimos e acrescentamos na mão. Isso precisa vir antes dos índices, que
+  // falham se a coluna não estiver lá.
+  const colunas = new Set(
+    (db.prepare('PRAGMA table_info(vagas)').all() as { name: string }[]).map(c => c.name),
+  );
+  if (!colunas.has('senioridade')) db.exec('ALTER TABLE vagas ADD COLUMN senioridade TEXT');
+  if (!colunas.has('salario')) db.exec('ALTER TABLE vagas ADD COLUMN salario REAL');
+
+  db.exec('CREATE INDEX IF NOT EXISTS idx_senior ON vagas (senioridade)');
+
   return db;
 }
 
@@ -79,12 +93,21 @@ export async function salvarLote(vagas: Vaga[]): Promise<{ novas: number; atuali
   const jaExiste = d.prepare('SELECT 1 FROM vagas WHERE id = ?');
   const gravar = d.prepare(`
     INSERT INTO vagas (id, fonte, titulo, empresa, logo, descricao, cidade, estado,
-                       modelo, contrato, area, afirmativa, publicadaEm, prazoAte, url, vistaEm)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       modelo, contrato, area, senioridade, salario, afirmativa,
+                       publicadaEm, prazoAte, url, vistaEm)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       titulo = excluded.titulo,
       empresa = excluded.empresa,
+      descricao = excluded.descricao,
+      modelo = excluded.modelo,
+      contrato = excluded.contrato,
+      area = excluded.area,
+      senioridade = excluded.senioridade,
+      salario = excluded.salario,
+      afirmativa = excluded.afirmativa,
       prazoAte = excluded.prazoAte,
+      url = excluded.url,
       vistaEm = excluded.vistaEm
   `);
 
@@ -92,8 +115,8 @@ export async function salvarLote(vagas: Vaga[]): Promise<{ novas: number; atuali
     if (jaExiste.get(v.id)) atualizadas++; else novas++;
     gravar.run(
       v.id, v.fonte, v.titulo, v.empresa, v.logo, v.descricao, v.cidade, v.estado,
-      v.modelo, v.contrato, v.area, v.afirmativa ? 1 : 0, v.publicadaEm, v.prazoAte,
-      v.url, v.vistaEm,
+      v.modelo, v.contrato, v.area, v.senioridade, v.salario, v.afirmativa ? 1 : 0,
+      v.publicadaEm, v.prazoAte, v.url, v.vistaEm,
     );
   }
 
@@ -141,6 +164,8 @@ export async function buscar(f: Filtros): Promise<Vaga[]> {
   if (f.contrato) { cond.push('contrato = ?');  val.push(f.contrato); }
   if (f.modelo)   { cond.push('modelo = ?');    val.push(f.modelo); }
   if (f.cidade)   { cond.push('cidade LIKE ?'); val.push(`%${f.cidade}%`); }
+  if (f.senioridade) { cond.push('senioridade = ?'); val.push(f.senioridade); }
+  if (f.salarioMin)  { cond.push('salario >= ?');    val.push(f.salarioMin); }
   if (f.dias) {
     cond.push('publicadaEm >= ?');
     val.push(new Date(Date.now() - f.dias * 86400000).toISOString());

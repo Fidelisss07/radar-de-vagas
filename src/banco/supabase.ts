@@ -49,7 +49,8 @@ function paraLinha(v: Vaga) {
   return {
     id: v.id, fonte: v.fonte, titulo: v.titulo, empresa: v.empresa, logo: v.logo,
     descricao: v.descricao, cidade: v.cidade, estado: v.estado, modelo: v.modelo,
-    contrato: v.contrato, area: v.area, afirmativa: v.afirmativa,
+    contrato: v.contrato, area: v.area, senioridade: v.senioridade,
+    salario: v.salario, afirmativa: v.afirmativa,
     publicada_em: v.publicadaEm, prazo_ate: v.prazoAte, url: v.url, vista_em: v.vistaEm,
   };
 }
@@ -61,6 +62,8 @@ function paraVaga(l: Record<string, unknown>): Vaga {
     descricao: String(l.descricao ?? ''), cidade: (l.cidade as string) ?? null,
     estado: (l.estado as string) ?? null, modelo: l.modelo as Vaga['modelo'],
     contrato: l.contrato as Vaga['contrato'], area: String(l.area),
+    senioridade: (l.senioridade as string) ?? null,
+    salario: l.salario === null || l.salario === undefined ? null : Number(l.salario),
     afirmativa: Boolean(l.afirmativa), publicadaEm: String(l.publicada_em),
     prazoAte: (l.prazo_ate as string) ?? null, url: String(l.url),
     vistaEm: String(l.vista_em),
@@ -167,6 +170,8 @@ export async function buscar(f: Filtros): Promise<Vaga[]> {
   if (f.contrato) p.push(`contrato=eq.${encodeURIComponent(f.contrato)}`);
   if (f.modelo)   p.push(`modelo=eq.${encodeURIComponent(f.modelo)}`);
   if (f.cidade)   p.push(`cidade=ilike.*${encodeURIComponent(f.cidade)}*`);
+  if (f.senioridade) p.push(`senioridade=eq.${encodeURIComponent(f.senioridade)}`);
+  if (f.salarioMin)  p.push(`salario=gte.${f.salarioMin}`);
   if (f.termo)    p.push(`or=(titulo.ilike.*${encodeURIComponent(f.termo)}*,empresa.ilike.*${encodeURIComponent(f.termo)}*)`);
   if (f.dias) {
     const desde = new Date(Date.now() - f.dias * 86400000).toISOString();

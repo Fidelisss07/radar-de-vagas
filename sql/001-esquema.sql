@@ -17,6 +17,8 @@ create table if not exists vagas (
   modelo        text        not null,
   contrato      text        not null,
   area          text        not null,
+  senioridade   text,
+  salario       numeric(10,2),
   afirmativa    boolean     not null default false,
   publicada_em  timestamptz not null,
   prazo_ate     timestamptz,
@@ -30,6 +32,8 @@ create index if not exists idx_vagas_area      on vagas (area);
 create index if not exists idx_vagas_contrato  on vagas (contrato);
 create index if not exists idx_vagas_modelo    on vagas (modelo);
 create index if not exists idx_vagas_cidade    on vagas (cidade);
+create index if not exists idx_vagas_senior    on vagas (senioridade);
+create index if not exists idx_vagas_salario   on vagas (salario) where salario is not null;
 create index if not exists idx_vagas_publicada on vagas (publicada_em desc);
 
 -- Busca textual em português: trata acento e plural, então "desenvolvedor"
