@@ -1,0 +1,24 @@
+{
+  "name": "radar-de-vagas",
+  "version": "0.1.0",
+  "description": "Coleta vagas de emprego de fontes públicas e deixa buscar por área, cidade, contrato e modelo de trabalho.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "coletar": "node src/cli.ts coletar",
+    "coletar:rapido": "node src/cli.ts coletar --fatias 12",
+    "status": "node src/cli.ts status",
+    "buscar": "node src/cli.ts buscar"
+  },
+  "keywords": [
+    "vagas",
+    "emprego",
+    "gupy",
+    "brasil"
+  ],
+  "author": "Gustavo Fidelis",
+  "license": "MIT"
+}
