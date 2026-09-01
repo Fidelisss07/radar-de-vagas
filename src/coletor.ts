@@ -8,7 +8,7 @@
 
 import { varrerFatia } from './fontes/gupy.ts';
 import { montarFatias, adivinharArea } from './dicionario.ts';
-import { abrirRodada, fecharRodada, salvarVaga } from './banco.ts';
+import { abrirRodada, fecharRodada, salvarLote } from './banco/index.ts';
 import type { Contrato, Fatia, Modelo, Vaga, VagaBruta } from './tipos.ts';
 
 const CONTRATOS: Record<string, Contrato> = {
@@ -82,18 +82,19 @@ export async function coletar(opcoes: Opcoes = {}) {
   const fatias = opcoes.limiteFatias ? todas.slice(0, opcoes.limiteFatias) : todas;
   const paginas = opcoes.paginasPorFatia ?? 3;
 
-  const rodada = abrirRodada();
+  const rodada = await abrirRodada();
   let encontradas = 0, novas = 0, atualizadas = 0, erros = 0;
 
   for (const [indice, fatia] of fatias.entries()) {
     try {
       const { vagas } = await varrerFatia(fatia, paginas);
-      let novasAqui = 0;
 
-      for (const bruta of vagas) {
-        const resultado = salvarVaga(normalizar(bruta, fatia));
-        if (resultado === 'nova') { novas++; novasAqui++; } else { atualizadas++; }
-      }
+      // Grava em lote: uma chamada por vaga seria lenta demais no Supabase,
+      // onde cada gravação é uma requisição de rede
+      const gravadas = await salvarLote(vagas.map(b => normalizar(b, fatia)));
+      novas += gravadas.novas;
+      atualizadas += gravadas.atualizadas;
+      const novasAqui = gravadas.novas;
 
       encontradas += vagas.length;
       opcoes.aoProgredir?.({
@@ -115,6 +116,6 @@ export async function coletar(opcoes: Opcoes = {}) {
     observacao: erros ? `${erros} fatia(s) falharam` : null,
   };
 
-  fecharRodada(rodada, resultado);
+  await fecharRodada(rodada, resultado);
   return resultado;
 }

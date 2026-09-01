@@ -26,6 +26,40 @@ node src/cli.ts buscar --modelo remoto --dias 7   # consulta
 
 Sem `--fatias`, percorre o dicionário inteiro.
 
+## Ligando no Supabase
+
+O SQLite serve para desenvolver. Em produção quem responde é o Supabase, porque
+a Vercel não hospeda arquivo de banco.
+
+1. Crie um projeto em [supabase.com](https://supabase.com) (o plano gratuito
+   dá conta com folga da escala inicial).
+2. Abra o **SQL Editor** e execute o conteúdo de [`sql/001-esquema.sql`](sql/001-esquema.sql).
+   Ele cria as tabelas, os índices e as políticas de segurança.
+3. Copie `.env.example` para `.env` e preencha com a URL do projeto e as chaves,
+   que ficam em **Project Settings → API**.
+
+Feito isso, o mesmo comando passa a gravar lá:
+
+```bash
+node --env-file=.env src/cli.ts coletar --fatias 8
+```
+
+A CLI diz para onde está gravando logo na primeira linha, então não tem como
+achar que subiu para produção e estar escrevendo no arquivo local.
+
+### Por que sem biblioteca do Supabase
+
+O Supabase expõe as tabelas por uma API REST. Falar com ela por `fetch` mantém o
+projeto sem nenhuma dependência — o que importa num coletor que vai rodar
+agendado, onde cada pacote a mais é uma coisa a mais para quebrar.
+
+### O que a segurança do banco faz
+
+Vaga de emprego é informação pública e o site precisa ler sem login, então a
+leitura é liberada para qualquer um. Escrita exige a chave de serviço, que fica
+no servidor e nunca chega ao navegador. Sem ela ninguém insere nada, mesmo
+conhecendo o endereço do banco.
+
 ## As decisões que moldaram o código
 
 ### O teto de 10.000
@@ -71,13 +105,18 @@ evita as três.
 
 ```
 src/
-  tipos.ts          formatos compartilhados
-  dicionario.ts     as fatias: cargos por setor, cidades, contratos
-  fontes/gupy.ts    cliente da API, com repetição e intervalo
-  banco.ts          persistência e consultas
-  coletor.ts        orquestra: fatia, normaliza, grava
-  cli.ts            linha de comando
-dados/              o banco (fora do versionamento)
+  tipos.ts            formatos compartilhados
+  dicionario.ts       as fatias: cargos por setor, cidades, contratos
+  fontes/gupy.ts      cliente da API, com repetição e intervalo
+  banco/
+    index.ts          escolhe o adaptador conforme o ambiente
+    sqlite.ts         desenvolvimento, sem servidor
+    supabase.ts       produção, por REST
+    tipos.ts          o contrato que os dois cumprem
+  coletor.ts          orquestra: fatia, normaliza, grava
+  cli.ts              linha de comando
+sql/                  esquema para colar no Supabase
+dados/                o banco local (fora do versionamento)
 ```
 
 ## Próximas fases

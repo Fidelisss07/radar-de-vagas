@@ -7,7 +7,7 @@
  */
 
 import { coletar } from './coletor.ts';
-import { buscar, resumo } from './banco.ts';
+import { buscar, resumo, ondeGrava } from './banco/index.ts';
 
 const args = process.argv.slice(2);
 const comando = args[0] ?? 'ajuda';
@@ -39,7 +39,7 @@ radar-de-vagas — coleta vagas de fontes públicas
 
 if (comando === 'coletar') {
   const inicio = Date.now();
-  console.log('Coletando…\n');
+  console.log(`Coletando para: ${ondeGrava()}\n`);
 
   const r = await coletar({
     limiteFatias: numero('fatias'),
@@ -65,8 +65,8 @@ if (comando === 'coletar') {
   console.log(`  fatias com falha   : ${r.erros}`);
 
 } else if (comando === 'status') {
-  const r = resumo();
-  console.log(`\nBanco: ${r.total} vagas\n`);
+  const r = await resumo();
+  console.log(`\nBanco: ${ondeGrava()} — ${r.total} vagas\n`);
 
   const bloco = (titulo: string, linhas: { chave: string; n: number }[]) => {
     console.log(titulo);
@@ -88,7 +88,7 @@ if (comando === 'coletar') {
   }
 
 } else if (comando === 'buscar') {
-  const vagas = buscar({
+  const vagas = await buscar({
     termo: opcao('termo'),
     area: opcao('area'),
     contrato: opcao('contrato'),

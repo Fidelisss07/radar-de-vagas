@@ -1,28 +1,31 @@
 /**
- * Persistência.
+ * Adaptador do SQLite.
  *
- * Usa o SQLite que já vem no Node — sem dependência externa e sem servidor para
- * subir. Na fase 2, quando o site entrar, a mesma interface passa a falar com
- * Postgres: por isso tudo aqui é função, e nada de fora toca no SQL direto.
+ * Usa o banco que já vem no Node — sem dependência e sem servidor para subir.
+ * Serve para desenvolver e testar a coleta sem depender de rede nem de conta
+ * em serviço nenhum. Em produção quem responde é o Supabase.
+ *
+ * As funções são assíncronas por fora, ainda que o SQLite seja síncrono por
+ * dentro: é o que permite trocar de banco sem mexer no resto do código.
  */
 
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Rodada, Vaga } from './tipos.ts';
+import type { Rodada, Vaga } from '../tipos.ts';
+import type { Filtros, Resumo } from './tipos.ts';
 
 const CAMINHO = process.env.RADAR_BANCO ?? 'dados/radar.db';
 
 let db: DatabaseSync | null = null;
 
-export function abrir(): DatabaseSync {
+function abrir(): DatabaseSync {
   if (db) return db;
 
   mkdirSync(dirname(CAMINHO), { recursive: true });
   db = new DatabaseSync(CAMINHO);
 
-  // WAL deixa leitura e escrita conviverem — importante quando o site estiver
-  // lendo enquanto o coletor grava
+  // WAL deixa leitura e escrita conviverem
   db.exec('PRAGMA journal_mode = WAL');
 
   db.exec(`
@@ -67,16 +70,14 @@ export function abrir(): DatabaseSync {
   return db;
 }
 
-/**
- * Grava uma vaga. Devolve 'nova' ou 'atualizada' — é assim que a rodada sabe
- * quanto de fato apareceu de novidade, em vez de contar a mesma vaga várias
- * vezes por ela cair em fatias diferentes.
- */
-export function salvarVaga(v: Vaga): 'nova' | 'atualizada' {
-  const d = abrir();
-  const existe = d.prepare('SELECT 1 FROM vagas WHERE id = ?').get(v.id);
+export const nome = 'sqlite';
 
-  d.prepare(`
+export async function salvarLote(vagas: Vaga[]): Promise<{ novas: number; atualizadas: number }> {
+  const d = abrir();
+  let novas = 0, atualizadas = 0;
+
+  const jaExiste = d.prepare('SELECT 1 FROM vagas WHERE id = ?');
+  const gravar = d.prepare(`
     INSERT INTO vagas (id, fonte, titulo, empresa, logo, descricao, cidade, estado,
                        modelo, contrato, area, afirmativa, publicadaEm, prazoAte, url, vistaEm)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -85,23 +86,30 @@ export function salvarVaga(v: Vaga): 'nova' | 'atualizada' {
       empresa = excluded.empresa,
       prazoAte = excluded.prazoAte,
       vistaEm = excluded.vistaEm
-  `).run(
-    v.id, v.fonte, v.titulo, v.empresa, v.logo, v.descricao, v.cidade, v.estado,
-    v.modelo, v.contrato, v.area, v.afirmativa ? 1 : 0, v.publicadaEm, v.prazoAte,
-    v.url, v.vistaEm,
-  );
+  `);
 
-  return existe ? 'atualizada' : 'nova';
+  for (const v of vagas) {
+    if (jaExiste.get(v.id)) atualizadas++; else novas++;
+    gravar.run(
+      v.id, v.fonte, v.titulo, v.empresa, v.logo, v.descricao, v.cidade, v.estado,
+      v.modelo, v.contrato, v.area, v.afirmativa ? 1 : 0, v.publicadaEm, v.prazoAte,
+      v.url, v.vistaEm,
+    );
+  }
+
+  return { novas, atualizadas };
 }
 
-export function abrirRodada(): number {
+export async function abrirRodada(): Promise<number> {
   const d = abrir();
   d.prepare('INSERT INTO rodadas (inicio) VALUES (?)').run(new Date().toISOString());
-  const linha = d.prepare('SELECT last_insert_rowid() AS id').get() as { id: number };
-  return linha.id;
+  return (d.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id;
 }
 
-export function fecharRodada(id: number, r: Omit<Rodada, 'id' | 'inicio' | 'fim'>): void {
+export async function fecharRodada(
+  id: number,
+  r: Omit<Rodada, 'id' | 'inicio' | 'fim'>,
+): Promise<void> {
   abrir().prepare(`
     UPDATE rodadas
        SET fim = ?, fatias = ?, encontradas = ?, novas = ?, atualizadas = ?, erros = ?, observacao = ?
@@ -109,15 +117,7 @@ export function fecharRodada(id: number, r: Omit<Rodada, 'id' | 'inicio' | 'fim'
   `).run(new Date().toISOString(), r.fatias, r.encontradas, r.novas, r.atualizadas, r.erros, r.observacao, id);
 }
 
-export interface Resumo {
-  total: number;
-  porArea: { area: string; n: number }[];
-  porContrato: { contrato: string; n: number }[];
-  porModelo: { modelo: string; n: number }[];
-  ultimasRodadas: Rodada[];
-}
-
-export function resumo(): Resumo {
+export async function resumo(): Promise<Resumo> {
   const d = abrir();
   const conta = (col: string) =>
     d.prepare(`SELECT ${col} AS chave, COUNT(*) AS n FROM vagas GROUP BY ${col} ORDER BY n DESC`)
@@ -132,18 +132,14 @@ export function resumo(): Resumo {
   };
 }
 
-/** Busca com os filtros da fase 2 — já disponível para conferir a coleta. */
-export function buscar(f: {
-  termo?: string; area?: string; contrato?: string; modelo?: string;
-  cidade?: string; dias?: number; limite?: number;
-}): Vaga[] {
+export async function buscar(f: Filtros): Promise<Vaga[]> {
   const cond: string[] = [];
   const val: (string | number)[] = [];
 
   if (f.termo)    { cond.push('(titulo LIKE ? OR empresa LIKE ?)'); val.push(`%${f.termo}%`, `%${f.termo}%`); }
-  if (f.area)     { cond.push('area = ?');     val.push(f.area); }
-  if (f.contrato) { cond.push('contrato = ?'); val.push(f.contrato); }
-  if (f.modelo)   { cond.push('modelo = ?');   val.push(f.modelo); }
+  if (f.area)     { cond.push('area = ?');      val.push(f.area); }
+  if (f.contrato) { cond.push('contrato = ?');  val.push(f.contrato); }
+  if (f.modelo)   { cond.push('modelo = ?');    val.push(f.modelo); }
   if (f.cidade)   { cond.push('cidade LIKE ?'); val.push(`%${f.cidade}%`); }
   if (f.dias) {
     cond.push('publicadaEm >= ?');
