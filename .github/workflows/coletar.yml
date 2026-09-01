@@ -1,0 +1,60 @@
+# Coleta agendada.
+#
+# Uma varredura inteira leva cerca de 19 minutos: 151 fatias, com 700ms entre
+# as requisições para não pesar na fonte. De 3 em 3 horas cobre bem o giro das
+# vagas — publicação de vaga é evento de horário comercial, não de segundo.
+#
+# Repositório público não gasta cota de Actions, então o custo é zero.
+
+name: coletar
+
+on:
+  schedule:
+    # 03:00, 06:00, ... UTC — os horários exatos variam alguns minutos, é normal
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+# Duas rodadas ao mesmo tempo brigariam pelas mesmas linhas sem ganhar nada
+concurrency:
+  group: coleta
+  cancel-in-progress: false
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Sem as chaves o coletor cairia no SQLite do runner, que some junto com
+      # a máquina. Falhar aqui é melhor que uma rodada verde que não gravou nada.
+      - name: Conferir as chaves
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then
+            echo "Faltam SUPABASE_URL e SUPABASE_SERVICE_KEY nos secrets do repositório."
+            echo "Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Testes
+        run: node --test "testes/*.test.ts"
+
+      - name: Coletar
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node src/cli.ts coletar
+
+      - name: Resumo
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node src/cli.ts status

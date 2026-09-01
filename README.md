@@ -47,6 +47,14 @@ candidatura", não "vaga exclusiva". E pegar o menor `R$` da descrição anuncia
 "R$ 507" numa vaga de back-end pleno: era o vale-alimentação. Número errado é
 pior que campo vazio, porque a pessoa descarta a vaga sem abrir.
 
+## Coleta automática
+
+O [workflow do GitHub Actions](.github/workflows/coletar.yml) roda a varredura
+completa de 3 em 3 horas. Ele lê `SUPABASE_URL` e `SUPABASE_SERVICE_KEY` dos
+secrets do repositório e falha de propósito se faltarem — sem isso a coleta
+cairia no SQLite do runner, que some quando a máquina desliga, e a rodada
+ficaria verde sem ter gravado nada.
+
 ## Ligando no Supabase
 
 O SQLite serve para desenvolver. Em produção quem responde é o Supabase, porque
