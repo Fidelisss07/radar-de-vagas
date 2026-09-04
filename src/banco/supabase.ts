@@ -165,6 +165,7 @@ export async function resumo(): Promise<Resumo> {
 
 export async function buscar(f: Filtros): Promise<Vaga[]> {
   const p: string[] = ['select=*', 'order=publicada_em.desc', `limit=${f.limite ?? 20}`];
+  if (f.deslocamento) p.push(`offset=${f.deslocamento}`);
 
   if (f.area)     p.push(`area=eq.${encodeURIComponent(f.area)}`);
   if (f.contrato) p.push(`contrato=eq.${encodeURIComponent(f.contrato)}`);

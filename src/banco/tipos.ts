@@ -12,6 +12,7 @@ export interface Filtros {
   salarioMin?: number;
   dias?: number;
   limite?: number;
+  deslocamento?: number;
 }
 
 export interface Resumo {

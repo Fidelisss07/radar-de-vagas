@@ -172,9 +172,14 @@ export async function buscar(f: Filtros): Promise<Vaga[]> {
   }
 
   const onde = cond.length ? `WHERE ${cond.join(' AND ')}` : '';
-  val.push(f.limite ?? 20);
+  val.push(f.limite ?? 20, f.deslocamento ?? 0);
 
-  return abrir()
-    .prepare(`SELECT * FROM vagas ${onde} ORDER BY publicadaEm DESC LIMIT ?`)
-    .all(...val) as unknown as Vaga[];
+  const linhas = abrir()
+    .prepare(`SELECT * FROM vagas ${onde} ORDER BY publicadaEm DESC LIMIT ? OFFSET ?`)
+    .all(...val) as unknown as Record<string, unknown>[];
+
+  // O SQLite nao tem booleano: guarda 0 e 1. Sem esta conversao o mesmo campo
+  // chegaria como numero aqui e como booleano no Supabase, e quem consome os
+  // dois teria de tratar os dois casos.
+  return linhas.map(l => ({ ...l, afirmativa: Boolean(l.afirmativa) })) as unknown as Vaga[];
 }

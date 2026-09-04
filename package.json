@@ -11,7 +11,8 @@
     "coletar": "node src/cli.ts coletar",
     "coletar:rapido": "node src/cli.ts coletar --fatias 12",
     "status": "node src/cli.ts status",
-    "buscar": "node src/cli.ts buscar"
+    "buscar": "node src/cli.ts buscar",
+    "api": "node src/api.ts"
   },
   "keywords": [
     "vagas",

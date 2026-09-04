@@ -47,6 +47,33 @@ candidatura", não "vaga exclusiva". E pegar o menor `R$` da descrição anuncia
 "R$ 507" numa vaga de back-end pleno: era o vale-alimentação. Número errado é
 pior que campo vazio, porque a pessoa descarta a vaga sem abrir.
 
+## API
+
+O site não fala com o banco: pede aqui e recebe a lista pronta, sem saber se por
+baixo responde SQLite ou Supabase.
+
+```bash
+node src/api.ts            # porta 3000, ou PORT do ambiente
+```
+
+| Rota | O que devolve |
+| --- | --- |
+| `GET /vagas` | lista filtrada e paginada |
+| `GET /status` | total, distribuição por área/contrato/modelo e últimas rodadas |
+| `GET /filtros` | as opções de cada filtro, para o front-end montar os menus |
+
+`/vagas` aceita `termo`, `area`, `contrato`, `modelo`, `cidade`, `senioridade`,
+`salario` (mínimo), `dias`, `limite` (teto 100) e `pagina`.
+
+```bash
+curl "http://localhost:3000/vagas?senioridade=aprendiz&modelo=remoto&limite=10"
+```
+
+Valor que não está na lista de opções é ignorado em vez de virar filtro que
+nunca casa — `?area=xpto` devolve tudo, não devolve vazio. `/filtros` existe
+justamente para o front-end não repetir essas listas e sair do ar quando o
+dicionário mudar.
+
 ## Coleta automática
 
 O [workflow do GitHub Actions](.github/workflows/coletar.yml) roda a varredura
